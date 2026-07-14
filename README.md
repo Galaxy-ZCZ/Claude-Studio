@@ -1,71 +1,104 @@
 # Claude Studio
 
-一个为 Claude Code 设计的可视化 GUI 桌面应用，参考 Codex 的设计风格。
+A powerful visual GUI for Claude Code, inspired by the Codex design style. Built with Electron + React + TypeScript.
 
-## ✨ 特性
+## ✨ Features
 
-- 🎨 **现代化 UI** - 参考 Codex 的深色主题设计
-- 💻 **代码编辑器** - 语法高亮、代码补全
-- 🤖 **AI 对话** - 与 Claude 实时对话，获取编程帮助
-- 🖥️ **集成终端** - 内置终端，无需切换窗口
-- 📁 **文件管理** - 可视化文件浏览器
-- ⚡ **高性能** - 基于 Electron，启动快速
+- 🎨 **Modern Dark UI** - Inspired by Codex / VS Code design language
+- 📝 **Monaco Editor** - Full-featured code editor (VS Code engine)
+- 🤖 **Claude AI Chat** - Real-time AI assistance with streaming responses
+- 🖥️ **Integrated Terminal** - Execute commands without leaving the IDE
+- 📁 **File Explorer** - Visual file tree with create/rename/delete
+- 🔀 **Git Integration** - View status, stage, commit, view diffs
+- 🔍 **Global Search** - Search across your entire project
+- ⌨️ **Command Palette** - Quick access to all commands (Ctrl+Shift+P)
+- ⚙️ **Customizable Settings** - Editor, API, theme settings
+- 💾 **Multi-tab Editor** - Open multiple files with tab management
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 安装依赖
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+
+### Install & Run
 
 ```bash
+# Clone the repository
+git clone https://github.com/Galaxy-ZCZ/Claude-Studio.git
+cd Claude-Studio
+
+# Install dependencies
 npm install
-```
 
-### 开发模式
-
-```bash
+# Start development
 npm run electron:dev
 ```
 
-### 构建应用
+### Or use the quick start script (Windows)
 
 ```bash
-npm run electron:build
+start.bat
 ```
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 Claude-Studio/
-├── electron/              # Electron 主进程
-│   ├── main/             # 主进程代码
-│   └── preload/          # 预加载脚本
-├── src/                  # React 前端
-│   ├── components/       # UI 组件
-│   ├── styles/          # 样式文件
-│   └── utils/           # 工具函数
-├── package.json          # 项目配置
-└── README.md            # 项目说明
+├── electron/                  # Electron main process
+│   ├── main/index.ts         # Window management, IPC handlers
+│   └── preload/index.ts      # Secure API bridge
+├── src/
+│   ├── components/
+│   │   ├── editor/           # Monaco Editor integration
+│   │   ├── chat/             # Claude AI chat panel
+│   │   ├── terminal/         # Integrated terminal
+│   │   ├── sidebar/          # File explorer, search, git
+│   │   ├── settings/         # Settings panel
+│   │   └── common/           # TitleBar, StatusBar, CommandPalette
+│   ├── store/                # Global state management
+│   ├── utils/                # Claude API, file system, git
+│   └── styles/               # Tailwind CSS
+├── package.json
+└── vite.config.ts
 ```
 
-## 🛠️ 技术栈
+## ⌨️ Keyboard Shortcuts
 
-- **前端**: React 18 + TypeScript + Tailwind CSS
-- **桌面框架**: Electron 28
-- **构建工具**: Vite
-- **包管理**: npm
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+N` | New File |
+| `Ctrl+O` | Open File |
+| `Ctrl+Shift+O` | Open Folder |
+| `Ctrl+S` | Save File |
+| `Ctrl+Shift+S` | Save As |
+| `Ctrl+B` | Toggle Sidebar |
+| `Ctrl+`` ` | Toggle Terminal |
+| `Ctrl+Shift+P` | Command Palette |
+| `Ctrl+W` | Close Tab |
 
-## 📝 开发计划
+## 🛠️ Tech Stack
 
-- [ ] 集成 Claude API
-- [ ] 完善代码编辑器 (Monaco Editor)
-- [ ] 添加文件浏览器
-- [ ] 支持多标签页
-- [ ] 添加主题切换
-- [ ] 支持插件扩展
+- **Frontend**: React 18 + TypeScript + Tailwind CSS
+- **Editor**: Monaco Editor (VS Code engine)
+- **Desktop**: Electron 28
+- **Build**: Vite
+- **AI**: Claude API (Anthropic)
 
-## 🤝 贡献
+## 📝 Configuration
 
-欢迎提交 Issue 和 Pull Request！
+### Claude API
 
-## 📄 许可证
+1. Open Settings (click the gear icon in the sidebar)
+2. Enter your Claude API key
+3. Select your preferred model
+4. Start chatting!
 
-MIT License
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE)

@@ -16,6 +16,14 @@ body {
   user-select: none;
 }
 
+/* Allow text selection in editor and chat */
+textarea,
+input,
+.monaco-editor,
+[contenteditable] {
+  user-select: text;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -34,24 +42,69 @@ body {
   background: #484f58;
 }
 
+::-webkit-scrollbar-corner {
+  background: #0d1117;
+}
+
+/* Drag region for title bar */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @layer components {
   .panel-header {
-    @apply flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d];
+    @apply flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d];
   }
 
   .panel-title {
-    @apply text-sm font-medium text-[#8b949e];
+    @apply text-xs font-medium text-[#8b949e] uppercase tracking-wider;
   }
 
   .btn-icon {
-    @apply p-1.5 rounded-md hover:bg-[#30363d] transition-colors duration-150;
+    @apply p-1.5 rounded-md hover:bg-[#30363d] transition-colors duration-100 text-[#8b949e] hover:text-[#e6edf3];
   }
 
   .btn-primary {
-    @apply px-4 py-2 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md transition-colors duration-150;
+    @apply px-3 py-1.5 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md transition-colors duration-100 text-sm font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-3 py-1.5 bg-[#30363d] hover:bg-[#484f58] text-[#e6edf3] rounded-md transition-colors duration-100 text-sm;
   }
 
   .input-field {
-    @apply w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-md text-[#e6edf3] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff];
+    @apply w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-md text-[#e6edf3] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff] focus:ring-1 focus:ring-[#58a6ff] text-sm;
   }
+}
+
+/* Selection color */
+::selection {
+  background: #264f78;
+}
+
+/* Fix Monaco editor container */
+.monaco-editor {
+  padding-top: 4px;
+}
+
+/* Animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
