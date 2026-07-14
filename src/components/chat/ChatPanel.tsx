@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useApp, ChatMessage } from '../../store/AppContext'
-import { getClaudeAPI } from '../../utils/claudeAPI'
+import { getLLMManager, LLMMessage } from '../../utils/llmProviders'
 import { v4 as uuid } from 'uuid'
 
 export default function ChatPanel() {
@@ -17,14 +17,26 @@ export default function ChatPanel() {
     }
   }, [state.messages])
 
-  // Initialize Claude API
-  useEffect(() => {
-    getClaudeAPI(state.settings.claude)
-  }, [state.settings.claude])
-
   const handleSend = useCallback(async () => {
     const text = input.trim()
     if (!text || state.isStreaming) return
+
+    const manager = getLLMManager()
+    const config = manager.getActiveConfig()
+    const provider = manager.getActiveProvider()
+
+    if (!provider?.apiKey) {
+      dispatch({
+        type: 'ADD_MESSAGE',
+        payload: {
+          id: uuid(),
+          role: 'system',
+          content: `⚠️ API key not configured for ${provider?.name || 'unknown provider'}. Go to Settings to add your API key.`,
+          timestamp: Date.now(),
+        },
+      })
+      return
+    }
 
     // Get code context from active editor tab
     const activeTab = state.tabs.find(t => t.id === state.activeTabId)
@@ -36,7 +48,7 @@ export default function ChatPanel() {
       role: 'user',
       content: text,
       timestamp: Date.now(),
-      codeContext: codeContext ? `[File: ${activeTab?.name}]\n${codeContext.slice(0, 2000)}` : undefined,
+      codeContext: codeContext ? `[File: ${activeTab?.name}]\n${codeContext.slice(0, 3000)}` : undefined,
     }
     dispatch({ type: 'ADD_MESSAGE', payload: userMsg })
     setInput('')
@@ -52,33 +64,62 @@ export default function ChatPanel() {
     dispatch({ type: 'SET_STREAMING', payload: true })
     streamingRef.current = true
 
-    const claude = getClaudeAPI()
+    // Build messages for API
+    const apiMessages: LLMMessage[] = []
 
-    // Send with streaming
-    await claude.sendMessage(
-      text,
-      state.messages,
-      codeContext ? `[File: ${activeTab?.name}]\n${codeContext.slice(0, 2000)}` : undefined,
-      {
-        onToken: (token) => {
-          if (streamingRef.current) {
-            dispatch({ type: 'UPDATE_LAST_MESSAGE', payload: token })
-          }
-        },
-        onComplete: () => {
-          dispatch({ type: 'SET_STREAMING', payload: false })
-          streamingRef.current = false
-        },
-        onError: (error) => {
-          dispatch({
-            type: 'UPDATE_LAST_MESSAGE',
-            payload: `\n\n⚠️ Error: ${error.message}`,
-          })
-          dispatch({ type: 'SET_STREAMING', payload: false })
-          streamingRef.current = false
-        },
+    // Add system prompt
+    if (config.systemPrompt) {
+      apiMessages.push({
+        role: 'system',
+        content: config.systemPrompt,
+      })
+    }
+
+    // Add code context
+    if (codeContext) {
+      apiMessages.push({
+        role: 'system',
+        content: `The user is currently editing a file named "${activeTab?.name}". Here's the content:\n\n\`\`\`\n${codeContext.slice(0, 3000)}\n\`\`\``,
+      })
+    }
+
+    // Add recent chat history (last 20 messages)
+    const recentHistory = state.messages.slice(-20)
+    for (const msg of recentHistory) {
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        apiMessages.push({
+          role: msg.role,
+          content: msg.content,
+        })
       }
-    )
+    }
+
+    // Add current message
+    apiMessages.push({
+      role: 'user',
+      content: text,
+    })
+
+    // Send via LLM manager
+    await manager.sendMessage(apiMessages, {
+      onToken: (token) => {
+        if (streamingRef.current) {
+          dispatch({ type: 'UPDATE_LAST_MESSAGE', payload: token })
+        }
+      },
+      onComplete: () => {
+        dispatch({ type: 'SET_STREAMING', payload: false })
+        streamingRef.current = false
+      },
+      onError: (error) => {
+        dispatch({
+          type: 'UPDATE_LAST_MESSAGE',
+          payload: `\n\n⚠️ Error: ${error.message}`,
+        })
+        dispatch({ type: 'SET_STREAMING', payload: false })
+        streamingRef.current = false
+      },
+    })
   }, [input, state.isStreaming, state.messages, state.tabs, state.activeTabId, dispatch])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -101,6 +142,11 @@ export default function ChatPanel() {
       })
     }
   }
+
+  const manager = getLLMManager()
+  const activeProvider = manager.getActiveProvider()
+  const activeModel = manager.getActiveModel()
+  const activeConfig = manager.getActiveConfig()
 
   // Format message content (handle code blocks)
   const formatContent = (content: string) => {
@@ -167,7 +213,12 @@ export default function ChatPanel() {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
             <path d="M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" />
           </svg>
-          <span className="panel-title">Claude</span>
+          <div className="flex flex-col">
+            <span className="panel-title">AI Chat</span>
+            <span className="text-[10px] text-[#484f58]">
+              {activeProvider?.name || 'No provider'} • {activeModel?.name || activeConfig?.modelId || 'No model'}
+            </span>
+          </div>
           {state.isStreaming && (
             <span className="text-xs text-[#3fb950] animate-pulse">●</span>
           )}
@@ -186,12 +237,20 @@ export default function ChatPanel() {
             <svg className="w-12 h-12 opacity-30" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
             </svg>
-            <p className="text-center">Ask Claude anything about your code</p>
-            <p className="text-[10px] text-center">
-              {state.settings.claude.apiKey
-                ? 'Tip: Open a file and Claude will see the context'
-                : '⚠️ Set API key in Settings first'}
-            </p>
+            <p className="text-center">Ask AI anything about your code</p>
+            <div className="text-center space-y-1">
+              <p className="text-[10px]">
+                Using: <span className="text-[#58a6ff]">{activeProvider?.name}</span>
+              </p>
+              <p className="text-[10px]">
+                Model: <span className="text-[#58a6ff]">{activeModel?.name || activeConfig?.modelId}</span>
+              </p>
+            </div>
+            {!activeProvider?.apiKey && (
+              <p className="text-[#d29922] text-center">
+                ⚠️ Set API key in Settings first
+              </p>
+            )}
           </div>
         )}
 
@@ -201,6 +260,8 @@ export default function ChatPanel() {
               className={`max-w-[90%] rounded-lg px-3 py-2.5 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-[#238636] text-white'
+                  : msg.role === 'system'
+                  ? 'bg-[#1c1e26] border border-[#d2992280] text-[#d29922]'
                   : 'bg-[#161b22] border border-[#30363d] text-[#e6edf3]'
               }`}
             >
@@ -227,13 +288,13 @@ export default function ChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={state.settings.claude.apiKey ? 'Ask Claude...' : 'Set API key in Settings...'}
-            disabled={!state.settings.claude.apiKey}
+            placeholder={activeProvider?.apiKey ? `Ask ${activeProvider.name}...` : 'Set API key in Settings...'}
+            disabled={!activeProvider?.apiKey}
             className="input-field resize-none text-sm h-16 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || state.isStreaming || !state.settings.claude.apiKey}
+            disabled={!input.trim() || state.isStreaming || !activeProvider?.apiKey}
             className="btn-primary self-end disabled:opacity-50 disabled:cursor-not-allowed text-sm py-2 px-3"
           >
             {state.isStreaming ? (
