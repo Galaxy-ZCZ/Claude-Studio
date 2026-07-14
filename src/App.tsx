@@ -7,6 +7,7 @@ import ChatPanel from './components/chat/ChatPanel'
 import Terminal from './components/terminal/Terminal'
 import StatusBar from './components/common/StatusBar'
 import CommandPalette from './components/common/CommandPalette'
+import DesktopPet from './components/pet/DesktopPet'
 
 const api = window.electronAPI
 
@@ -129,6 +130,7 @@ function AppContent() {
 
       <StatusBar />
       <CommandPalette />
+      <DesktopPet />
     </div>
   )
 }
