@@ -5,17 +5,14 @@ const fs = window.require ? window.require('fs') : null
 const path = window.require ? window.require('path') : null
 
 export interface AppSettingsData {
-  // LLM Configuration
-  providers: Array<{
-    id: string
-    apiKey: string
-    baseURL: string
-    models: Array<{
-      id: string
-      name: string
-      contextLength?: number
-      maxOutput?: number
-    }>
+  // LLM Configuration - stored as Record for easy lookup
+  providers: Record<string, {
+    apiKey?: string
+    baseURL?: string
+    type?: string
+    models?: string[]
+    name?: string
+    headers?: Record<string, string>
   }>
   activeConfig: {
     providerId: string
@@ -48,24 +45,10 @@ export interface AppSettingsData {
     petMood: number
     sidebarView: string
   }
-
-  // Custom providers (user-defined)
-  customProviders: Array<{
-    id: string
-    name: string
-    type: 'openai' | 'claude' | 'custom'
-    baseURL: string
-    apiKey: string
-    models: Array<{
-      id: string
-      name: string
-    }>
-    headers?: Record<string, string>
-  }>
 }
 
 const defaultSettings: AppSettingsData = {
-  providers: [],
+  providers: {},
   activeConfig: {
     providerId: 'claude',
     modelId: 'claude-sonnet-4-20250514',
@@ -94,7 +77,6 @@ Be concise and helpful.`,
     petMood: 100,
     sidebarView: 'files',
   },
-  customProviders: [],
 }
 
 function getSettingsPath(): string | null {

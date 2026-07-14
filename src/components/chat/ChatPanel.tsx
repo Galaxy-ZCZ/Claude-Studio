@@ -22,7 +22,7 @@ export default function ChatPanel() {
     if (!text || state.isStreaming) return
 
     const manager = getLLMManager()
-    const config = manager.getActiveConfig()
+    const config = manager.getConfig()
     const provider = manager.getActiveProvider()
 
     if (!provider?.apiKey) {
@@ -145,8 +145,8 @@ export default function ChatPanel() {
 
   const manager = getLLMManager()
   const activeProvider = manager.getActiveProvider()
-  const activeModel = manager.getActiveModel()
-  const activeConfig = manager.getActiveConfig()
+  const activeConfig = manager.getConfig()
+  const activeModel = activeConfig.modelId
 
   // Format message content (handle code blocks)
   const formatContent = (content: string) => {
@@ -161,44 +161,23 @@ export default function ChatPanel() {
             <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] text-xs text-[#8b949e]">
               <span>{lang || 'code'}</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => navigator.clipboard.writeText(code)}
-                  className="hover:text-[#e6edf3] transition-colors"
-                  title="Copy"
-                >
-                  📋
-                </button>
+                <button onClick={() => navigator.clipboard.writeText(code)} className="hover:text-[#e6edf3]" title="Copy">📋</button>
                 {state.tabs.length > 0 && (
-                  <button
-                    onClick={() => handleInsertCode(code)}
-                    className="hover:text-[#e6edf3] transition-colors"
-                    title="Insert into editor"
-                  >
-                    📥
-                  </button>
+                  <button onClick={() => handleInsertCode(code)} className="hover:text-[#e6edf3]" title="Insert">📥</button>
                 )}
               </div>
             </div>
-            <pre className="p-3 bg-[#0d1117] text-xs overflow-x-auto">
-              <code>{code}</code>
-            </pre>
+            <pre className="p-3 bg-[#0d1117] text-xs overflow-x-auto"><code>{code}</code></pre>
           </div>
         )
       }
-
-      // Regular text with inline code
       return (
         <span key={i}>
-          {part.split(/(`[^`]+`)/g).map((segment, j) => {
-            if (segment.startsWith('`') && segment.endsWith('`')) {
-              return (
-                <code key={j} className="bg-[#30363d80] px-1 py-0.5 rounded text-[#58a6ff] text-xs">
-                  {segment.slice(1, -1)}
-                </code>
-              )
-            }
-            return <span key={j}>{segment}</span>
-          })}
+          {part.split(/(`[^`]+`)/g).map((segment, j) =>
+            segment.startsWith('`') && segment.endsWith('`') ? (
+              <code key={j} className="bg-[#30363d80] px-1 py-0.5 rounded text-[#58a6ff] text-xs">{segment.slice(1, -1)}</code>
+            ) : <span key={j}>{segment}</span>
+          )}
         </span>
       )
     })
@@ -216,7 +195,7 @@ export default function ChatPanel() {
           <div className="flex flex-col">
             <span className="panel-title">AI Chat</span>
             <span className="text-[10px] text-[#484f58]">
-              {activeProvider?.name || 'No provider'} • {activeModel?.name || activeConfig?.modelId || 'No model'}
+              {activeProvider?.name || 'No provider'} • {activeModel || 'No model'}
             </span>
           </div>
           {state.isStreaming && (
@@ -243,7 +222,7 @@ export default function ChatPanel() {
                 Using: <span className="text-[#58a6ff]">{activeProvider?.name}</span>
               </p>
               <p className="text-[10px]">
-                Model: <span className="text-[#58a6ff]">{activeModel?.name || activeConfig?.modelId}</span>
+                Model: <span className="text-[#58a6ff]">{activeModel || 'Not set'}</span>
               </p>
             </div>
             {!activeProvider?.apiKey && (

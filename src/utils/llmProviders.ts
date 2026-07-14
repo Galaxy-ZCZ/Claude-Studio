@@ -1,34 +1,30 @@
 // ─── LLM Provider System ─────────────────────────────
-// Supports multiple API formats: OpenAI-compatible, Claude, custom
+// Universal LLM provider supporting OpenAI-compatible & Anthropic-compatible APIs
+// Users can configure ANY model via API key + model name
+
+export type ProviderType = 'openai' | 'anthropic'
 
 export interface LLMProvider {
   id: string
   name: string
-  type: 'openai' | 'claude' | 'custom'
+  type: ProviderType
   baseURL: string
   apiKey: string
-  models: LLMModel[]
+  models: string[] // Model IDs - can be anything the user inputs
   headers?: Record<string, string>
 }
 
-export interface LLMModel {
-  id: string
-  name: string
-  contextLength?: number
-  maxOutput?: number
+export interface LLMConfig {
+  providerId: string
+  modelId: string // Can be ANY string - user input
+  temperature: number
+  maxTokens: number
+  systemPrompt: string
 }
 
 export interface LLMMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-}
-
-export interface LLMConfig {
-  providerId: string
-  modelId: string
-  temperature?: number
-  maxTokens?: number
-  systemPrompt?: string
 }
 
 export interface StreamCallbacks {
@@ -37,223 +33,286 @@ export interface StreamCallbacks {
   onError: (error: Error) => void
 }
 
-// ─── Default Providers ───────────────────────────────
-export const defaultProviders: LLMProvider[] = [
-  {
-    id: 'claude',
-    name: 'Anthropic Claude',
-    type: 'claude',
-    baseURL: 'https://api.anthropic.com/v1',
-    apiKey: '',
-    models: [
-      { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', contextLength: 200000, maxOutput: 8192 },
-      { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', contextLength: 200000, maxOutput: 8192 },
-      { id: 'claude-haiku-4-20250514', name: 'Claude Haiku 4', contextLength: 200000, maxOutput: 8192 },
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', contextLength: 200000, maxOutput: 8192 },
-    ],
-  },
+// ─── Popular Providers (presets for quick setup) ─────
+export const presetProviders: Array<{
+  id: string
+  name: string
+  type: ProviderType
+  baseURL: string
+  models: string[]
+}> = [
+  // ─── OpenAI Compatible ───
   {
     id: 'openai',
     name: 'OpenAI',
     type: 'openai',
     baseURL: 'https://api.openai.com/v1',
-    apiKey: '',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o', contextLength: 128000, maxOutput: 4096 },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', contextLength: 128000, maxOutput: 4096 },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', contextLength: 128000, maxOutput: 4096 },
-      { id: 'o1-preview', name: 'o1-preview', contextLength: 128000, maxOutput: 32768 },
-    ],
+    models: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o1-pro', 'o3', 'o3-mini', 'o4-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano'],
   },
   {
     id: 'deepseek',
     name: 'DeepSeek',
     type: 'openai',
     baseURL: 'https://api.deepseek.com/v1',
-    apiKey: '',
-    models: [
-      { id: 'deepseek-chat', name: 'DeepSeek Chat', contextLength: 64000, maxOutput: 4096 },
-      { id: 'deepseek-coder', name: 'DeepSeek Coder', contextLength: 64000, maxOutput: 4096 },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', contextLength: 64000, maxOutput: 4096 },
-    ],
+    models: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner', 'deepseek-r1'],
   },
   {
     id: 'xiaomi-mimo',
     name: 'Xiaomi MiMo',
     type: 'openai',
     baseURL: 'https://api.xiaomi.com/v1',
-    apiKey: '',
-    models: [
-      { id: 'mimo-v2-pro', name: 'MiMo V2 Pro', contextLength: 128000, maxOutput: 4096 },
-      { id: 'mimo-v2-flash', name: 'MiMo V2 Flash', contextLength: 128000, maxOutput: 4096 },
-    ],
+    models: ['mimo-v2-pro', 'mimo-v2-flash', 'MiMo-GPT-4o', 'MiMo-7B-RL'],
   },
   {
     id: 'zhipu',
     name: 'Zhipu AI (智谱)',
     type: 'openai',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-    apiKey: '',
-    models: [
-      { id: 'glm-4-plus', name: 'GLM-4 Plus', contextLength: 128000, maxOutput: 4096 },
-      { id: 'glm-4-flash', name: 'GLM-4 Flash', contextLength: 128000, maxOutput: 4096 },
-      { id: 'glm-4-long', name: 'GLM-4 Long', contextLength: 1000000, maxOutput: 4096 },
-    ],
+    models: ['glm-4-plus', 'glm-4-flash', 'glm-4-long', 'glm-4v-plus', 'glm-4v-flash', 'glm-z1-air', 'glm-z1-airx', 'glm-z1-flash'],
   },
   {
     id: 'qwen',
     name: 'Alibaba Qwen (通义)',
     type: 'openai',
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKey: '',
-    models: [
-      { id: 'qwen-max', name: 'Qwen Max', contextLength: 32000, maxOutput: 4096 },
-      { id: 'qwen-plus', name: 'Qwen Plus', contextLength: 131072, maxOutput: 4096 },
-      { id: 'qwen-turbo', name: 'Qwen Turbo', contextLength: 131072, maxOutput: 4096 },
-      { id: 'qwen-coder-plus', name: 'Qwen Coder Plus', contextLength: 131072, maxOutput: 4096 },
-    ],
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-coder-plus', 'qwq-plus', 'qwq-max', 'qwen3-235b-a22b', 'qwen3-32b', 'qwen3-8b'],
   },
   {
     id: 'moonshot',
     name: 'Moonshot AI (月之暗面)',
     type: 'openai',
     baseURL: 'https://api.moonshot.cn/v1',
-    apiKey: '',
-    models: [
-      { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K', contextLength: 128000, maxOutput: 4096 },
-      { id: 'moonshot-v1-32k', name: 'Moonshot V1 32K', contextLength: 32000, maxOutput: 4096 },
-      { id: 'moonshot-v1-8k', name: 'Moonshot V1 8K', contextLength: 8000, maxOutput: 4096 },
-    ],
+    models: ['moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k', 'kimi-latest'],
   },
   {
     id: 'doubao',
     name: 'ByteDance Doubao (豆包)',
     type: 'openai',
     baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKey: '',
-    models: [
-      { id: 'doubao-pro-128k', name: 'Doubao Pro 128K', contextLength: 128000, maxOutput: 4096 },
-      { id: 'doubao-lite-128k', name: 'Doubao Lite 128K', contextLength: 128000, maxOutput: 4096 },
-    ],
+    models: ['doubao-1.5-pro-256k', 'doubao-1.5-pro-32k', 'doubao-1.5-lite-32k', 'doubao-pro-128k', 'doubao-lite-128k'],
   },
   {
     id: 'minimax',
     name: 'MiniMax',
     type: 'openai',
     baseURL: 'https://api.minimax.chat/v1',
-    apiKey: '',
-    models: [
-      { id: 'abab6.5-chat', name: 'Abab 6.5 Chat', contextLength: 32000, maxOutput: 4096 },
-      { id: 'abab6.5s-chat', name: 'Abab 6.5s Chat', contextLength: 32000, maxOutput: 4096 },
-    ],
+    models: ['MiniMax-Text-01', 'abab6.5-chat', 'abab6.5s-chat', 'MiniMax-M1'],
   },
   {
-    id: 'custom',
-    name: 'Custom Provider',
+    id: 'baichuan',
+    name: 'Baichuan (百川)',
     type: 'openai',
-    baseURL: '',
-    apiKey: '',
+    baseURL: 'https://api.baichuan-ai.com/v1',
+    models: ['Baichuan4', 'Baichuan3-Turbo', 'Baichuan4-Turbo'],
+  },
+  {
+    id: 'yi',
+    name: '01.AI (零一万物)',
+    type: 'openai',
+    baseURL: 'https://api.lingyiwanwu.com/v1',
+    models: ['yi-large', 'yi-medium', 'yi-spark', 'yi-large-turbo', 'yi-lightning'],
+  },
+  {
+    id: 'stepfun',
+    name: 'StepFun (阶跃星辰)',
+    type: 'openai',
+    baseURL: 'https://api.stepfun.com/v1',
+    models: ['step-2-16k', 'step-2-16k-exp', 'step-1-flash', 'step-1v-8k'],
+  },
+  {
+    id: 'spark',
+    name: 'iFlytek Spark (讯飞星火)',
+    type: 'openai',
+    baseURL: 'https://spark-api-open.xf-yun.com/v1',
+    models: ['generalv3.5', 'generalv3', '4.0Ultra', 'max-32k'],
+  },
+  {
+    id: 'internlm',
+    name: 'InternLM (书生)',
+    type: 'openai',
+    baseURL: 'https://internlm-chat.intern-ai.org.cn/puyu/api/v1',
+    models: ['internlm2.5-latest', 'internlm2-latest'],
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    type: 'openai',
+    baseURL: 'https://api.groq.com/openai/v1',
+    models: ['llama-4-maverick-17b-128e-instruct', 'llama-4-scout-17b-16e-instruct', 'llama3-70b-8192', 'llama3-8b-8192', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+  },
+  {
+    id: 'together',
+    name: 'Together AI',
+    type: 'openai',
+    baseURL: 'https://api.together.xyz/v1',
+    models: ['meta-llama/Llama-4-Maverick-17B-128E-Instruct', 'meta-llama/Llama-4-Scout-17B-16E-Instruct', 'meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen3-235B-A22B'],
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    type: 'openai',
+    baseURL: 'https://openrouter.ai/api/v1',
+    models: ['anthropic/claude-sonnet-4', 'google/gemini-2.5-pro-preview', 'meta-llama/llama-4-maverick', 'deepseek/deepseek-r1', 'qwen/qwen3-235b-a22b'],
+  },
+  {
+    id: 'siliconflow',
+    name: 'SiliconFlow (硅基流动)',
+    type: 'openai',
+    baseURL: 'https://api.siliconflow.cn/v1',
+    models: ['deepseek-ai/DeepSeek-R1', 'deepseek-ai/DeepSeek-V3', 'Qwen/Qwen3-235B-A22B', 'THUDM/GLM-Z1-32B-0414', 'Pro/deepseek-ai/DeepSeek-R1'],
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    type: 'openai',
+    baseURL: 'http://localhost:11434/v1',
+    models: ['llama3.3', 'qwen3', 'deepseek-r1', 'codellama', 'mistral', 'gemma3', 'phi4'],
+  },
+  {
+    id: 'lmstudio',
+    name: 'LM Studio (Local)',
+    type: 'openai',
+    baseURL: 'http://localhost:1234/v1',
     models: [],
+  },
+  {
+    id: 'vllm',
+    name: 'vLLM (Local)',
+    type: 'openai',
+    baseURL: 'http://localhost:8000/v1',
+    models: [],
+  },
+
+  // ─── Anthropic Compatible ───
+  {
+    id: 'claude',
+    name: 'Anthropic Claude',
+    type: 'anthropic',
+    baseURL: 'https://api.anthropic.com/v1',
+    models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-haiku-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229'],
   },
 ]
 
-// ─── Provider Manager ────────────────────────────────
-export class LLMProviderManager {
-  private providers: LLMProvider[]
-  private activeConfig: LLMConfig
-
-  constructor() {
-    this.providers = [...defaultProviders]
-    this.activeConfig = {
-      providerId: 'claude',
-      modelId: 'claude-sonnet-4-20250514',
-      temperature: 0.7,
-      maxTokens: 4096,
-      systemPrompt: `You are Claude, an AI assistant integrated into Claude Studio IDE.
+// ─── Default Config ──────────────────────────────────
+export const defaultConfig: LLMConfig = {
+  providerId: 'claude',
+  modelId: 'claude-sonnet-4-20250514',
+  temperature: 0.7,
+  maxTokens: 8192,
+  systemPrompt: `You are an AI coding assistant integrated into Claude Studio IDE.
 You help users write, understand, and debug code.
 When providing code, use markdown code blocks with language identifiers.
 Be concise and helpful.`,
+}
+
+// ─── Provider Manager ────────────────────────────────
+export class LLMProviderManager {
+  private providers: Map<string, LLMProvider>
+  private config: LLMConfig
+
+  constructor() {
+    this.providers = new Map()
+    this.config = { ...defaultConfig }
+
+    // Load presets
+    for (const preset of presetProviders) {
+      this.providers.set(preset.id, {
+        ...preset,
+        apiKey: '',
+      })
     }
   }
 
-  // Load from settings
+  // ─── Load/Save ───────────────────────────────────
   loadSettings(settings: any) {
     if (settings.providers) {
-      // Merge custom providers with defaults
-      for (const provider of settings.providers) {
-        const existing = this.providers.find(p => p.id === provider.id)
+      for (const [id, data] of Object.entries(settings.providers) as [string, any][]) {
+        const existing = this.providers.get(id)
         if (existing) {
-          Object.assign(existing, provider)
+          existing.apiKey = data.apiKey || existing.apiKey
+          if (data.models?.length) existing.models = data.models
+          if (data.baseURL) existing.baseURL = data.baseURL
         } else {
-          this.providers.push(provider)
+          // Custom provider
+          this.providers.set(id, {
+            id,
+            name: data.name || id,
+            type: data.type || 'openai',
+            baseURL: data.baseURL || '',
+            apiKey: data.apiKey || '',
+            models: data.models || [],
+            headers: data.headers,
+          })
         }
       }
     }
     if (settings.activeConfig) {
-      this.activeConfig = { ...this.activeConfig, ...settings.activeConfig }
+      this.config = { ...this.config, ...settings.activeConfig }
     }
   }
 
-  // Save settings
   toSettings() {
-    return {
-      providers: this.providers.map(p => ({
-        id: p.id,
+    const providers: Record<string, any> = {}
+    for (const [id, p] of this.providers) {
+      providers[id] = {
         apiKey: p.apiKey,
         baseURL: p.baseURL,
+        type: p.type,
         models: p.models,
-      })),
-      activeConfig: this.activeConfig,
+        name: p.name,
+        headers: p.headers,
+      }
+    }
+    return {
+      providers,
+      activeConfig: this.config,
     }
   }
 
+  // ─── Provider CRUD ───────────────────────────────
   getProviders(): LLMProvider[] {
-    return this.providers
+    return Array.from(this.providers.values())
   }
 
   getProvider(id: string): LLMProvider | undefined {
-    return this.providers.find(p => p.id === id)
+    return this.providers.get(id)
   }
 
   getActiveProvider(): LLMProvider | undefined {
-    return this.providers.find(p => p.id === this.activeConfig.providerId)
+    return this.providers.get(this.config.providerId)
   }
 
-  getActiveModel(): LLMModel | undefined {
-    const provider = this.getActiveProvider()
-    return provider?.models.find(m => m.id === this.activeConfig.modelId)
-  }
-
-  getActiveConfig(): LLMConfig {
-    return this.activeConfig
-  }
-
-  setActiveConfig(config: Partial<LLMConfig>) {
-    this.activeConfig = { ...this.activeConfig, ...config }
+  setActiveProvider(id: string) {
+    if (this.providers.has(id)) {
+      this.config.providerId = id
+    }
   }
 
   updateProvider(id: string, updates: Partial<LLMProvider>) {
-    const provider = this.providers.find(p => p.id === id)
-    if (provider) {
-      Object.assign(provider, updates)
-    }
+    const p = this.providers.get(id)
+    if (p) Object.assign(p, updates)
   }
 
   addProvider(provider: LLMProvider) {
-    const existing = this.providers.find(p => p.id === provider.id)
-    if (existing) {
-      Object.assign(existing, provider)
-    } else {
-      this.providers.push(provider)
-    }
+    this.providers.set(provider.id, provider)
   }
 
   removeProvider(id: string) {
-    if (id === 'custom') return // Can't remove custom
-    this.providers = this.providers.filter(p => p.id !== id)
+    // Don't remove presets, just clear API key
+    const p = this.providers.get(id)
+    if (p) p.apiKey = ''
   }
 
-  // ─── API Calls ─────────────────────────────────────
+  // ─── Config ──────────────────────────────────────
+  getConfig(): LLMConfig {
+    return { ...this.config }
+  }
+
+  updateConfig(updates: Partial<LLMConfig>) {
+    Object.assign(this.config, updates)
+  }
+
+  // ─── API Calls ───────────────────────────────────
   async sendMessage(
     messages: LLMMessage[],
     callbacks: StreamCallbacks
@@ -264,40 +323,37 @@ Be concise and helpful.`,
       return
     }
 
-    if (!provider.apiKey) {
-      callbacks.onError(new Error(`API key not configured for ${provider.name}. Go to Settings to add your API key.`))
-      return
+    if (!provider.apiKey && provider.type !== 'openai') {
+      // Ollama/LM Studio etc. don't need API key
+      const needsKey = !['ollama', 'lmstudio', 'vllm'].includes(provider.id)
+      if (needsKey) {
+        callbacks.onError(new Error(`API key not configured for ${provider.name}. Go to Settings to add your API key.`))
+        return
+      }
     }
 
     try {
-      switch (provider.type) {
-        case 'claude':
-          await this.sendClaudeMessage(provider, messages, callbacks)
-          break
-        case 'openai':
-        case 'custom':
-          await this.sendOpenAIMessage(provider, messages, callbacks)
-          break
-        default:
-          callbacks.onError(new Error(`Unsupported provider type: ${provider.type}`))
+      if (provider.type === 'anthropic') {
+        await this.sendAnthropicMessage(provider, messages, callbacks)
+      } else {
+        await this.sendOpenAIMessage(provider, messages, callbacks)
       }
     } catch (error) {
       callbacks.onError(error instanceof Error ? error : new Error(String(error)))
     }
   }
 
-  private async sendClaudeMessage(
+  private async sendAnthropicMessage(
     provider: LLMProvider,
     messages: LLMMessage[],
     callbacks: StreamCallbacks
   ) {
-    const config = this.activeConfig
     const systemMessage = messages.find(m => m.role === 'system')
     const chatMessages = messages.filter(m => m.role !== 'system')
 
     const body: any = {
-      model: config.modelId,
-      max_tokens: config.maxTokens || 4096,
+      model: this.config.modelId,
+      max_tokens: this.config.maxTokens,
       messages: chatMessages.map(m => ({
         role: m.role,
         content: m.content,
@@ -305,12 +361,13 @@ Be concise and helpful.`,
       stream: true,
     }
 
-    if (systemMessage || config.systemPrompt) {
-      body.system = systemMessage?.content || config.systemPrompt
+    const systemPrompt = systemMessage?.content || this.config.systemPrompt
+    if (systemPrompt) {
+      body.system = systemPrompt
     }
 
-    if (config.temperature !== undefined) {
-      body.temperature = config.temperature
+    if (this.config.temperature !== undefined) {
+      body.temperature = this.config.temperature
     }
 
     const headers: Record<string, string> = {
@@ -320,12 +377,11 @@ Be concise and helpful.`,
       ...provider.headers,
     }
 
-    // Enable browser access for development
-    if (typeof window !== 'undefined') {
-      headers['anthropic-dangerous-direct-browser-access'] = 'true'
-    }
+    // Enable direct browser access for development
+    headers['anthropic-dangerous-direct-browser-access'] = 'true'
 
-    const response = await fetch(`${provider.baseURL}/messages`, {
+    const baseURL = provider.baseURL.replace(/\/+$/, '')
+    const response = await fetch(`${baseURL}/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -333,10 +389,10 @@ Be concise and helpful.`,
 
     if (!response.ok) {
       const errText = await response.text()
-      throw new Error(`Claude API Error ${response.status}: ${errText}`)
+      throw new Error(`Anthropic API Error ${response.status}: ${errText}`)
     }
 
-    await this.handleSSEStream(response, callbacks, 'claude')
+    await this.handleSSEStream(response, callbacks, 'anthropic')
   }
 
   private async sendOpenAIMessage(
@@ -344,11 +400,8 @@ Be concise and helpful.`,
     messages: LLMMessage[],
     callbacks: StreamCallbacks
   ) {
-    const config = this.activeConfig
-
-    // Build messages with system prompt
     const apiMessages: any[] = []
-    const systemPrompt = config.systemPrompt || messages.find(m => m.role === 'system')?.content
+    const systemPrompt = this.config.systemPrompt || messages.find(m => m.role === 'system')?.content
     if (systemPrompt) {
       apiMessages.push({ role: 'system', content: systemPrompt })
     }
@@ -359,24 +412,27 @@ Be concise and helpful.`,
     }
 
     const body: any = {
-      model: config.modelId,
+      model: this.config.modelId,
       messages: apiMessages,
-      max_tokens: config.maxTokens || 4096,
+      max_tokens: this.config.maxTokens,
       stream: true,
     }
 
-    if (config.temperature !== undefined) {
-      body.temperature = config.temperature
+    if (this.config.temperature !== undefined) {
+      body.temperature = this.config.temperature
     }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${provider.apiKey}`,
       ...provider.headers,
     }
 
-    const baseURL = provider.baseURL.endsWith('/') ? provider.baseURL.slice(0, -1) : provider.baseURL
+    // Some providers need Bearer, some don't
+    if (provider.apiKey) {
+      headers['Authorization'] = `Bearer ${provider.apiKey}`
+    }
 
+    const baseURL = provider.baseURL.replace(/\/+$/, '')
     const response = await fetch(`${baseURL}/chat/completions`, {
       method: 'POST',
       headers,
@@ -394,7 +450,7 @@ Be concise and helpful.`,
   private async handleSSEStream(
     response: Response,
     callbacks: StreamCallbacks,
-    format: 'claude' | 'openai'
+    format: 'anthropic' | 'openai'
   ) {
     const reader = response.body?.getReader()
     if (!reader) throw new Error('No response body')
@@ -411,21 +467,20 @@ Be concise and helpful.`,
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data: ')) continue
+        const data = trimmed.slice(6)
         if (data === '[DONE]') continue
 
         try {
           const parsed = JSON.parse(data)
 
-          if (format === 'claude') {
-            // Claude format
+          if (format === 'anthropic') {
             if (parsed.type === 'content_block_delta') {
               const text = parsed.delta?.text
               if (text) callbacks.onToken(text)
             }
           } else {
-            // OpenAI format
             const delta = parsed.choices?.[0]?.delta
             if (delta?.content) {
               callbacks.onToken(delta.content)
@@ -438,18 +493,6 @@ Be concise and helpful.`,
     }
 
     callbacks.onComplete()
-  }
-
-  // Non-streaming version
-  async sendMessageSync(messages: LLMMessage[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      let result = ''
-      this.sendMessage(messages, {
-        onToken: (token) => { result += token },
-        onComplete: () => resolve(result),
-        onError: (error) => reject(error),
-      })
-    })
   }
 }
 
